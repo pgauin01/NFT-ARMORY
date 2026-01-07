@@ -1,3 +1,10 @@
+await weapon.setTokenContract("0xd356F687BEFFB2A7c9cEec05CBF84165eFCbB703");
+const weapon = await ethers.getContractAt("AIWeapon", "0x513b7D18ba1463F932665caBeBA8d90651f49a50");
+// CHECK YOUR App.jsx FOR THE EXACT ADDRESSES!
+// First arg: Weapon Address, Second arg: Token Address
+// 1. Point the Weapon Contract to the Token Contract
+await weapon.gameToken();
+const weapon = await ethers.getContractAt("AIWeapon", "0x513b7D18ba1463F932665caBeBA8d90651f49a50");
   console.log(e.reason || e.message); 
 } catch (e) {
   await monster.attack(2);
