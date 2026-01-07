@@ -1,0 +1,130 @@
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;600&display=swap");
+
+:root {
+  --neon-green: #00ff41;
+  --neon-blue: #00f3ff;
+  --neon-red: #ff0055;
+  --neon-gold: #ffd700;
+  --bg-dark: #050505;
+  --glass-bg: rgba(20, 20, 20, 0.7);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-dark);
+  color: white;
+  font-family: "Roboto Mono", monospace;
+  background-image: linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Orbitron", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/* --- THE GLASS CARD --- */
+.cyber-card {
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  backdrop-filter: blur(10px);
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.cyber-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+  border-color: var(--neon-blue);
+}
+
+/* --- THE BUTTONS --- */
+.btn {
+  padding: 12px 24px;
+  border: none;
+  font-family: "Orbitron", sans-serif;
+  font-weight: bold;
+  cursor: pointer;
+  text-transform: uppercase;
+  clip-path: polygon(
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%,
+    0 10px
+  );
+  transition: all 0.2s;
+}
+
+.btn-green {
+  background: var(--neon-green);
+  color: black;
+  box-shadow: 0 0 10px var(--neon-green);
+}
+.btn-green:hover {
+  background: white;
+  box-shadow: 0 0 20px white;
+}
+
+.btn-red {
+  background: var(--neon-red);
+  color: white;
+  box-shadow: 0 0 10px var(--neon-red);
+}
+.btn-red:hover {
+  background: white;
+  color: black;
+  box-shadow: 0 0 20px var(--neon-red);
+}
+
+.btn-gold {
+  background: transparent;
+  border: 1px solid var(--neon-gold);
+  color: var(--neon-gold);
+}
+.btn-gold:hover {
+  background: var(--neon-gold);
+  color: black;
+}
+
+/* --- INPUTS --- */
+.cyber-input {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #333;
+  color: var(--neon-green);
+  padding: 15px;
+  font-family: "Roboto Mono", monospace;
+  font-size: 16px;
+  width: 100%;
+  border-radius: 5px;
+}
+.cyber-input:focus {
+  outline: none;
+  border-color: var(--neon-green);
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
+}
+
+/* --- LOADING SPINNER --- */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-left-color: var(--neon-green);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}

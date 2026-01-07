@@ -1,0 +1,27 @@
+  console.log(e.reason || e.message); 
+} catch (e) {
+  await monster.attack(2);
+try {
+// 4. Try the attack manually to see the REAL error message
+console.log("Is Monster the owner of Token?", await token.owner() === monster.target); 
+ Check if Monster can mint (Assuming Ownable)
+// 3.
+console.log("Am I the owner of Weapon 2?", 
+const [owner] = await ethers.getSigners();
+// 2. Check Permissions (Crucial!)
+const token = await etheconst weapon = await ethers.getContractAt("AIWeapon", "0x513b7D18ba1463F932665caBeBA8d90651f49a50");
+const monster = await ethers.getContractAt("Monster", "0x00c15f057BD4e5e3908182B571d4c9CA796Ad098");
+}// 1. Get your contracts
+  console.log(e.reason || e.message); 
+} catch (e) {
+  await monster.attack(2);
+try {
+// 4. Try the attack manually to see the REAL error message
+console.log("Is Monster the owner of Token?", await token.owner() === monster.target); 
+// 3. Check if Monster can mint (Assuming Ownable)
+console.log("Am I the owner of Weapon 2?", await weapon.ownerOf(2) === owner.address);
+const [owner] = await ethers.getSigners();
+// 2. Check Permissions (Crucial!)
+const token = await etheconst weapon = await ethers.getContractAt("AIWeapon", "0x513b7D18ba1463F932665caBeBA8d90651f49a50");
+const monster = await ethers.getContractAt("Monster", "0x00c15f057BD4e5e3908182B571d4c9CA796Ad098");
+// 1. Get your contracts
