@@ -1,21 +1,19 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-  // 1. Get the Contract Factory
-  // Make sure the name inside getContractFactory matches the class name in your Solidity file
   const AIWeapon = await ethers.getContractFactory("AIWeapon");
 
-  console.log("🤖 Deploying AIWeapon contract...");
+  // ⚠️ REPLACE THIS WITH YOUR REAL TOKEN ADDRESS FROM deploy-economy.js
+  const TOKEN_ADDRESS = "0xA39F0F97ebD816FBde2bc7fa73a5EfF3F5f2E680";
 
-  // 2. Deploy
-  const contract = await AIWeapon.deploy();
+  console.log(`🤖 Deploying AIWeapon linked to Token: ${TOKEN_ADDRESS}...`);
 
-  // 3. Wait for it to finish
+  // ✅ FIX: Pass the address into deploy()
+  const contract = await AIWeapon.deploy(TOKEN_ADDRESS);
+
   await contract.waitForDeployment();
 
-  // 4. Log the address
   console.log(`✅ AIWeapon deployed to: ${contract.target}`);
-  console.log("👉 Copy this address into your React App.jsx!");
 }
 
 main().catch((error) => {
