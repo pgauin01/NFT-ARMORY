@@ -3,6 +3,9 @@ import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from dotenv import load_dotenv # Import this
+
+load_dotenv() # Load the variables from .env
 
 # Try importing LangChain - if this fails, we catch it
 try:
@@ -26,10 +29,15 @@ app.add_middleware(
 # --- 2. API KEY SETUP (Hardcode it here just for testing) ---
 # Replace this with your actual key starting with "AIza..."
 MY_GOOGLE_KEY = os.getenv("MY_GOOGLE_KEY")
-
+print(f"🔑 Using Google API Key: {MY_GOOGLE_KEY}")
+# Setup the AI Model
 # Setup the AI Model
 try:
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro")
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",    # CHANGED: 2.5 doesn't exist yet, use 1.5-flash
+        google_api_key=MY_GOOGLE_KEY # CHANGED: Explicitly pass your key here!
+    )
+    print("✅ Gemini Model Initialized Successfully")
 except Exception as e:
     print(f"❌ Error setting up Gemini: {e}")
 

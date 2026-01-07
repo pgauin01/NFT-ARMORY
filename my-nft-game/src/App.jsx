@@ -15,29 +15,34 @@ function App() {
   // --- STATE VARIABLES ---
   const [account, setAccount] = useState(null);
   const [goldBalance, setGoldBalance] = useState("0");
-  // Add this near the top with your other states
   const [myWeapons, setMyWeapons] = useState([]);
+
   // AI / Minting State
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [status, setStatus] = useState("");
   const [nftData, setNftData] = useState(null);
-  const [userWeaponId, setUserWeaponId] = useState(null); // Track which ID we own
+
+  // 🛠️ FIX 1: Consolidated State (Deleted userWeaponId, using only this one)
+  // Default is NULL so we know when nothing is equipped
+  const [selectedWeaponId, setSelectedWeaponId] = useState(null);
 
   // Battle State
   const [monsterHP, setMonsterHP] = useState(100);
   const [killCount, setKillCount] = useState(0);
   const [battleLog, setBattleLog] = useState([]);
-  // C. LOAD MARKET LISTINGS
+
+  // Market State
   const [marketItems, setMarketItems] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [monsterName, setMonsterName] = useState("Unknown Entity");
-  const [monsterMaxHP, setMonsterMaxHP] = useState(100); // Default
-  const [selectedWeaponId, setSelectedWeaponId] = useState(0);
+  const [monsterMaxHP, setMonsterMaxHP] = useState(100);
+  const [globalKillCount, setGlobalKillCount] = useState(0);
 
   // --- INITIALIZATION ---
   useEffect(() => {
     fetchMonsterStats();
+    fetchLeaderboard();
   }, []);
 
   // --- 1. WALLET CONNECTION ---
@@ -59,24 +64,19 @@ function App() {
     if (account) {
       loadMyArmory();
       fetchMonsterStats();
-    }
-  }, [account]); // Re-run when account changes
-
-  // Add this to your existing useEffect so it loads on startup
-  useEffect(() => {
-    if (account) {
       fetchGoldBalance();
       loadMarketplace();
-      // ... other fetch calls
+      fetchLeaderboard(); // Load leaderboard on start
     }
   }, [account]);
 
   // --- 9. LEADERBOARD SYSTEM ---
-
+  // --- 9. LEADERBOARD SYSTEM (FIXED) ---
   const fetchLeaderboard = async () => {
     try {
+      if (!account) return;
+
       const provider = new ethers.BrowserProvider(window.ethereum);
-      // We need a contract instance with the Provider (Read-only is fine)
       const monsterABI = MonsterABI.abi ? MonsterABI.abi : MonsterABI;
       const contract = new ethers.Contract(
         MONSTER_ADDRESS,
@@ -84,16 +84,23 @@ function App() {
         provider
       );
 
-      // 1. Fetch ALL "RewardLog" events from the beginning of time
-      // (This is like reading the blockchain's diary)
+      // 1. Fetch ALL "RewardLog" events
       const filter = contract.filters.RewardLog();
       const events = await contract.queryFilter(filter);
 
-      // 2. Aggregate Scores (Count kills per player)
-      const stats = {};
+      // ✅ A. Calculate GLOBAL Kills (Total events = Total deaths)
+      setGlobalKillCount(events.length);
 
+      // ✅ B. Calculate YOUR Kills
+      const myKills = events.filter(
+        (event) => event.args[0].toLowerCase() === account.toLowerCase()
+      ).length;
+      setKillCount(myKills);
+
+      // 2. Aggregate Scores for the Hall of Fame List
+      const stats = {};
       events.forEach((event) => {
-        const player = event.args[0]; // The first arg in RewardLog is the player address
+        const player = event.args[0];
         if (stats[player]) {
           stats[player] += 1;
         } else {
@@ -101,7 +108,7 @@ function App() {
         }
       });
 
-      // 3. Convert to Array & Sort (Highest kills first)
+      // 3. Convert to Array & Sort
       const sortedList = Object.keys(stats)
         .map((player) => ({
           address: player,
@@ -114,27 +121,18 @@ function App() {
       console.error("Error fetching leaderboard:", err);
     }
   };
-
-  // Add fetchLeaderboard() to your main useEffect so it loads on startup!
   const fetchGoldBalance = async () => {
     if (!account) return;
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
-
-      // 🛠️ FIX: Handle both ABI formats automatically
-      // Make sure TokenABI is imported at the top!
       const tokenABI = TokenABI.abi ? TokenABI.abi : TokenABI;
-
       const contract = new ethers.Contract(TOKEN_ADDRESS, tokenABI, provider);
-
       const bal = await contract.balanceOf(account);
       setGoldBalance(ethers.formatEther(bal));
     } catch (e) {
       console.log("Error loading gold balance:", e.message);
     }
   };
-
-  // Call this inside your useEffect and after attacking
 
   // --- 5. LOAD ALL WEAPONS ---
   const loadMyArmory = async () => {
@@ -150,25 +148,18 @@ function App() {
         provider
       );
 
-      // 1. Get total weapons minted ever
       const totalCount = await contract.tokenCounter();
       const count = Number(totalCount);
 
       let ownedWeapons = [];
 
-      // 2. Loop through every ID (Simple & brute force)
       for (let i = 0; i < count; i++) {
         try {
           const owner = await contract.ownerOf(i);
-
-          // If YOU are the owner, fetch the details
-          // (We use .toLowerCase() to avoid case-sensitivity issues)
           if (owner.toLowerCase() === account.toLowerCase()) {
             const tokenURI = await contract.tokenURI(i);
             const base64String = tokenURI.split(",")[1];
             const json = JSON.parse(atob(base64String));
-
-            // Add the ID to the object so we can use it for battling later
             ownedWeapons.push({ id: i, ...json });
           }
         } catch (err) {
@@ -178,6 +169,16 @@ function App() {
 
       setMyWeapons(ownedWeapons);
       setStatus(`✅ Loaded ${ownedWeapons.length} weapons.`);
+
+      // 🛠️ FIX 2: Auto-select the first weapon if none is selected
+      if (ownedWeapons.length > 0 && selectedWeaponId === null) {
+        setSelectedWeaponId(ownedWeapons[0].id);
+        console.log(
+          "🔫 Auto-selected Weapon ID:",
+          ownedWeapons[0].id,
+          selectedWeaponId
+        );
+      }
     } catch (error) {
       console.error(error);
       setStatus("❌ Error loading armory.");
@@ -194,7 +195,6 @@ function App() {
     setNftData(null);
 
     try {
-      // A. Call Python Backend
       const response = await fetch("http://127.0.0.1:8000/generate_weapon", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -205,26 +205,18 @@ function App() {
 
       const aiData = await response.json();
       console.log("🤖 AI Generated:", aiData);
-
       setStatus(`✨ AI created: ${aiData.name}. Minting to Blockchain...`);
 
-      // B. Call Smart Contract
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-
-      // Robust ABI handling
       const contractABI = AIWeaponABI.abi ? AIWeaponABI.abi : AIWeaponABI;
       const contract = new ethers.Contract(WEAPON_ADDRESS, contractABI, signer);
-
-      // ... inside handleGenerateAndMint ...
-
-      console.log("🎨 AI Art:", aiData.svg); // Debug log
 
       const tx = await contract.mintAIWeapon(
         aiData.name,
         aiData.description,
         aiData.level,
-        aiData.svg // <--- NEW: Pass the SVG code
+        aiData.svg
       );
 
       console.log("Tx Hash:", tx.hash);
@@ -233,16 +225,15 @@ function App() {
       setStatus("✅ Minted! Retrieving NFT...");
       setTimeout(() => {
         loadMyArmory();
-      }, 2000); // Small 2s delay ensures the blockchain node has indexed it
+      }, 2000);
 
-      // Optional: Clear input
       setPrompt("");
 
-      // C. Get Token ID
-      // (Simplified: assuming next ID is count - 1)
       const count = await contract.tokenCounter();
       const newTokenId = Number(count) - 1;
-      setUserWeaponId(newTokenId); // Save this ID for battling!
+
+      // 🛠️ FIX 3: Set the NEW consolidated variable
+      setSelectedWeaponId(newTokenId);
 
       fetchNFT(newTokenId);
     } catch (error) {
@@ -264,7 +255,6 @@ function App() {
       );
 
       const tokenURI = await contract.tokenURI(tokenId);
-
       const base64String = tokenURI.split(",")[1];
       const jsonString = atob(base64String);
       const json = JSON.parse(jsonString);
@@ -288,7 +278,6 @@ function App() {
         provider
       );
 
-      // Fetch all data in parallel
       const hp = await contract.currentHP();
       const max = await contract.maxHP();
       const name = await contract.monsterName();
@@ -302,107 +291,124 @@ function App() {
   };
 
   const fetchBattleLogs = async () => {
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const monsterABI = MonsterABI.abi ? MonsterABI.abi : MonsterABI;
-    // ✅ CORRECT: Passing 'signer' allows you to write (Attack/Mint/Transfer)
-    const signer = await provider.getSigner(); // Ensure you get the signer first!
+    // Safety check: if wallet isn't connected, we can't filter by "your" hits
+    if (!account) return;
 
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const monsterABI = MonsterABI.abi ? MonsterABI.abi : MonsterABI;
     const monsterContract = new ethers.Contract(
       MONSTER_ADDRESS,
       monsterABI,
       signer
     );
+
     try {
       if (!monsterContract) return;
 
-      console.log("Fetching Battle Logs...");
+      // 1. Find the last time the monster died
+      const rewardFilter = monsterContract.filters.RewardLog();
+      const deathEvents = await monsterContract.queryFilter(
+        rewardFilter,
+        0,
+        "latest"
+      );
 
-      // 1. Safety Check: Does the ABI support this event?
-      // If this is undefined, it proves your JSON file is still old.
-      if (!monsterContract.filters.Attack) {
-        console.error(
-          "CRITICAL: 'AttackLog' event not found in ABI. Please update Monster.json in src."
-        );
-        return;
+      let lastDeathBlock = 0;
+      if (deathEvents.length > 0) {
+        const lastDeath = deathEvents[deathEvents.length - 1];
+        lastDeathBlock = lastDeath.blockNumber;
       }
 
-      // 2. Fetch Events
-      // In Ethers v6, we can sometimes just pass the string name
-      const events = await monsterContract.queryFilter("Attack");
-      console.log(`Found ${events.length} logs.`);
+      // 2. Fetch all attacks since the last death
+      const attackEvents = await monsterContract.queryFilter(
+        "Attack",
+        lastDeathBlock,
+        "latest"
+      );
 
-      // 3. Format
-      const formattedLogs = events.map((event) => {
-        return {
-          player: event.args[0],
-          damage: event.args[1].toString(),
-          timestamp: new Date(
-            Number(event.args[3]) * 1000
-          ).toLocaleTimeString(),
-        };
+      // 3. 🛠️ DOUBLE FILTER:
+      //    A. Must be on the current monster (newer than last death)
+      //    B. Must be YOUR address (event.args[0] is the attacker)
+      const myAttacksOnThisMonster = attackEvents.filter((event) => {
+        const isCurrentMonster = event.blockNumber > lastDeathBlock;
+        const isMe = event.args[0].toLowerCase() === account.toLowerCase();
+        return isCurrentMonster && isMe;
       });
+
+      console.log(
+        `Found ${myAttacksOnThisMonster.length} of YOUR hits on this monster.`
+      );
+
+      // 4. Format the logs
+      const formattedLogs = await Promise.all(
+        myAttacksOnThisMonster.map(async (event) => {
+          let timestamp = "Loading...";
+          try {
+            const block = await event.getBlock();
+            timestamp = new Date(block.timestamp * 1000).toLocaleTimeString();
+          } catch (e) {
+            console.log("Could not fetch block time");
+          }
+          return {
+            player: event.args[0], // This will always be you now
+            damage: event.args[1].toString(),
+            timestamp: timestamp,
+          };
+        })
+      );
 
       setBattleLog(formattedLogs.reverse());
     } catch (error) {
       console.error("Error fetching logs:", error);
     }
   };
-
   const attackMonster = async () => {
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const monsterABI = MonsterABI.abi ? MonsterABI.abi : MonsterABI;
-    // ✅ CORRECT: Passing 'signer' allows you to write (Attack/Mint/Transfer)
-    const signer = await provider.getSigner(); // Ensure you get the signer first!
+    // 🛠️ FIX 4: Guard Clause - Block attack if ID is null
+    if (selectedWeaponId === null) {
+      alert("⚠️ Please select/equip a weapon first!");
+      return;
+    }
 
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const monsterABI = MonsterABI.abi ? MonsterABI.abi : MonsterABI;
     const monsterContract = new ethers.Contract(
       MONSTER_ADDRESS,
       monsterABI,
       signer
     );
+
     if (!monsterContract) return;
 
     try {
-      console.log("⚔️ Starting Attack...");
-      // setIsAttacking(true); // Start Animation
+      console.log("⚔️ Starting Attack with Weapon ID:", selectedWeaponId);
 
-      // 1. Send Transaction
-      // Make sure selectedWeaponId is a number or string, not an object
       const tx = await monsterContract.attackMonster(selectedWeaponId);
       console.log("Tx sent:", tx.hash);
 
-      // 2. Wait for Receipt
       console.log("⏳ Waiting for confirmation...");
       const receipt = await tx.wait();
       console.log("✅ Attack Confirmed! Block:", receipt.blockNumber);
 
-      // 3. Force UI Updates
-      await fetchMonsterStats(); // Update HP
-      await fetchBattleLogs(); // Update Hall of Fame
-      await fetchGoldBalance(); // Update Gold
+      await fetchMonsterStats();
+      await fetchBattleLogs();
+      await fetchGoldBalance();
+      await fetchLeaderboard();
     } catch (error) {
       console.error("❌ Attack Failed:", error);
-
-      // Specific check for the common "Weapon Ownership" bug
       if (error.message.includes("Not your weapon")) {
         alert("Error: You don't own this weapon!");
       } else {
         alert("Attack failed! Check console for details.");
       }
-    } finally {
-      // setIsAttacking(false); // Stop Animation (Always runs)
     }
   };
-  // Helper to render SVG even if AI forgot the namespace
-  // Helper Component (Put this above your App function)
-  // Helper to render SVG safely
+
   const RenderSVG = ({ dataURI }) => {
     if (!dataURI) return null;
-
-    // Decode Base64
     const base64 = dataURI.split(",")[1];
     const rawSvg = atob(base64);
-
-    // Fix namespace if missing
     const fixedSvg = rawSvg.includes("xmlns")
       ? rawSvg
       : rawSvg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg" ');
@@ -410,17 +416,16 @@ function App() {
     return (
       <div
         style={{
-          width: "100%", // 🛠️ FIX: Fit parent width
-          height: "auto", // 🛠️ FIX: Adjust height automatically
-          aspectRatio: "1/1", // Keep it square
+          width: "100%",
+          height: "auto",
+          aspectRatio: "1/1",
           background: "#111",
-          borderRadius: "8px", // Nice rounded corners
-          overflow: "hidden", // Cut off anything sticking out
+          borderRadius: "8px",
+          overflow: "hidden",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
         }}
-        // Inject the SVG HTML
         dangerouslySetInnerHTML={{
           __html: fixedSvg
             .replace(/width="\d+"/, 'width="100%"')
@@ -431,13 +436,11 @@ function App() {
   };
 
   // --- 7. UPGRADE SYSTEM ---
-  // --- 7. UPGRADE SYSTEM (FIXED) ---
   const upgradeWeapon = async (weaponId) => {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
 
-      // 🛠️ FIX 1: Handle Token ABI safely
       const tokenABI = TokenABI.abi ? TokenABI.abi : TokenABI;
       const tokenContract = new ethers.Contract(
         TOKEN_ADDRESS,
@@ -445,7 +448,6 @@ function App() {
         signer
       );
 
-      // 🛠️ FIX 2: Handle Weapon ABI safely
       const weaponABI = AIWeaponABI.abi ? AIWeaponABI.abi : AIWeaponABI;
       const weaponContract = new ethers.Contract(
         WEAPON_ADDRESS,
@@ -454,20 +456,18 @@ function App() {
       );
 
       const cost = ethers.parseEther("10");
+      console.log("upgrading weapon", WEAPON_ADDRESS, cost);
 
       setStatus("⏳ Step 1/2: Approving Gold...");
-      // 1. Approve (This might trigger a MetaMask popup)
       const tx1 = await tokenContract.approve(WEAPON_ADDRESS, cost);
       await tx1.wait();
+      console.log("Approved Gold for upgrade", weaponId);
 
       setStatus("🔨 Step 2/2: Upgrading Weapon...");
-      // 2. Upgrade (This triggers the second popup)
       const tx2 = await weaponContract.upgradeWeapon(weaponId);
       await tx2.wait();
 
       setStatus("✅ Upgrade Complete! Level +1");
-
-      // Refresh UI
       loadMyArmory();
       fetchGoldBalance();
     } catch (err) {
@@ -477,14 +477,11 @@ function App() {
   };
 
   // --- 8. MARKETPLACE ACTIONS ---
-
-  // A. SELL (List Item)
   const sellWeapon = async (id, priceInGold) => {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
 
-      // 🛠️ FIX: Handle ABI format safely
       const marketABI = MarketABI.abi ? MarketABI.abi : MarketABI;
       const weaponABI = AIWeaponABI.abi ? AIWeaponABI.abi : AIWeaponABI;
 
@@ -502,12 +499,10 @@ function App() {
       const price = ethers.parseEther(priceInGold.toString());
 
       setStatus("⏳ Approving Market to sell your NFT...");
-      // 1. Approve Market
       const tx1 = await weaponContract.approve(MARKET_ADDRESS, id);
       await tx1.wait();
 
       setStatus("📢 Listing item...");
-      // 2. List Item
       const tx2 = await marketContract.listItem(id, price);
       await tx2.wait();
 
@@ -525,9 +520,8 @@ function App() {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
 
-      // 🛠️ FIX: Handle ABI format safely
       const marketABI = MarketABI.abi ? MarketABI.abi : MarketABI;
-      const tokenABI = TokenABI.abi ? TokenABI.abi : TokenABI; // Ensure TokenABI is imported!
+      const tokenABI = TokenABI.abi ? TokenABI.abi : TokenABI;
 
       const marketContract = new ethers.Contract(
         MARKET_ADDRESS,
@@ -541,12 +535,10 @@ function App() {
       );
 
       setStatus("⏳ Approving Gold Payment...");
-      // 1. Approve Gold
       const tx1 = await tokenContract.approve(MARKET_ADDRESS, priceInWei);
       await tx1.wait();
 
       setStatus("💰 Buying Weapon...");
-      // 2. Buy
       const tx2 = await marketContract.buyItem(id);
       await tx2.wait();
 
@@ -564,8 +556,6 @@ function App() {
     if (!account) return;
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
-
-      // 🛠️ FIX: Handle ABI format safely for BOTH contracts
       const marketABI = MarketABI.abi ? MarketABI.abi : MarketABI;
       const weaponABI = AIWeaponABI.abi ? AIWeaponABI.abi : AIWeaponABI;
 
@@ -580,22 +570,13 @@ function App() {
         provider
       );
 
-      // Get total weapons to scan
-      // (Note: In a real production app, we would use a Graph indexer for this,
-      // but looping is fine for a prototype)
       const total = await weaponContract.tokenCounter();
       let items = [];
 
       for (let i = 0; i < Number(total); i++) {
         const listing = await marketContract.listings(i);
-
-        // listing returns struct: [seller, price, active]
-        // listing[2] is the boolean 'active'
         if (listing[2] === true) {
-          // Fetch NFT Data (Name, Image, etc.)
           const tokenURI = await weaponContract.tokenURI(i);
-
-          // Decode the Base64 JSON
           const base64Part = tokenURI.split(",")[1];
           const jsonString = atob(base64Part);
           const json = JSON.parse(jsonString);
@@ -603,7 +584,7 @@ function App() {
           items.push({
             id: i,
             seller: listing[0],
-            price: listing[1], // Price is in Wei
+            price: listing[1],
             ...json,
           });
         }
@@ -613,10 +594,8 @@ function App() {
       console.log("Error loading market:", e);
     }
   };
-  // --- RENDER UI ---
-  // ... (Keep all your existing functions above this line) ...
 
-  // --- NEW RENDER UI ---
+  // --- RENDER UI ---
   return (
     <div style={{ minHeight: "100vh", paddingBottom: "100px" }}>
       {/* 1. HEADER & HUD */}
@@ -643,7 +622,6 @@ function App() {
         </div>
 
         <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
-          {/* GOLD BADGE */}
           <div
             style={{
               background: "rgba(255, 215, 0, 0.1)",
@@ -717,14 +695,12 @@ function App() {
             </button>
           </div>
 
-          {/* Status Message */}
           {status && (
             <div style={{ marginTop: "20px", color: "var(--neon-green)" }}>
               {status}
             </div>
           )}
 
-          {/* NEW MINT SHOWCASE */}
           {nftData && (
             <div style={{ marginTop: "40px", animation: "fadeIn 1s" }}>
               <div
@@ -781,10 +757,9 @@ function App() {
           >
             <h2 style={{ color: "var(--neon-red)" }}>👺 Boss Arena</h2>
 
-            {/* Monster Name Header */}
             <h2
               style={{
-                color: monsterName.includes("DRAGON") ? "#ff00ff" : "white", // Purple for Boss
+                color: monsterName.includes("DRAGON") ? "#ff00ff" : "white",
                 textShadow: monsterName.includes("DRAGON")
                   ? "0 0 20px #ff00ff"
                   : "none",
@@ -818,34 +793,19 @@ function App() {
             <h1 style={{ fontSize: "40px", margin: "0", color: "#fff" }}>
               {monsterHP} / {monsterMaxHP} HP
             </h1>
-            <div
-              style={{
-                height: "10px",
-                background: "#333",
-                borderRadius: "5px",
-                overflow: "hidden",
-                marginBottom: "20px",
-              }}
-            >
-              <div
-                style={{
-                  width: `${monsterHP}%`,
-                  height: "100%",
-                  background: "var(--neon-red)",
-                  transition: "width 0.3s",
-                }}
-              ></div>
-            </div>
 
             <p style={{ color: "#aaa" }}>💀 Kill Count: {killCount}</p>
+            <p style={{ color: "#aaa" }}>
+              💀 Global Kill Count: {globalKillCount}
+            </p>
 
             <button
               className="btn btn-red"
               onClick={attackMonster}
-              disabled={userWeaponId === null}
+              disabled={selectedWeaponId === null}
               style={{ width: "100%", fontSize: "18px", marginTop: "20px" }}
             >
-              {userWeaponId === null
+              {selectedWeaponId === null
                 ? "⚠️ EQUIP WEAPON FIRST"
                 : "⚔️ ATTACK BOSS"}
             </button>
@@ -868,9 +828,15 @@ function App() {
                 battleLog.map((log, index) => (
                   <div
                     key={index}
-                    style={{ color: index === 0 ? "#fff" : "#888" }}
+                    style={{
+                      color: index === 0 ? "#fff" : "#888",
+                      marginBottom: "5px",
+                      borderBottom: "1px solid #222",
+                    }}
                   >
-                    {log}
+                    <span style={{ color: "#666" }}>[{log.timestamp}]</span>{" "}
+                    Player {log.player.slice(0, 6)}... hit for{" "}
+                    <span style={{ color: "red" }}>{log.damage} DMG</span>
                   </div>
                 ))}
             </div>
@@ -911,7 +877,8 @@ function App() {
             >
               {myWeapons.map((weapon) => {
                 if (!weapon || !weapon.image) return null;
-                const isEquipped = userWeaponId === weapon.id;
+                // 🛠️ FIX 5: Updated logic to use 'selectedWeaponId'
+                const isEquipped = selectedWeaponId === weapon.id;
                 const canAffordUpgrade = parseFloat(goldBalance) >= 10;
 
                 return (
@@ -929,7 +896,6 @@ function App() {
                       position: "relative",
                     }}
                   >
-                    {/* Render SVG (Scaled Down) */}
                     <div
                       style={{
                         transform: "scale(0.8)",
@@ -960,8 +926,9 @@ function App() {
                       LVL {weapon.attributes[0].value}
                     </div>
 
+                    {/* 🛠️ FIX 6: Equip button now updates the consolidated state */}
                     <button
-                      onClick={() => setUserWeaponId(weapon.id)}
+                      onClick={() => setSelectedWeaponId(weapon.id)}
                       style={{
                         width: "100%",
                         padding: "5px",
@@ -976,7 +943,6 @@ function App() {
                       {isEquipped ? "EQUIPPED" : "EQUIP"}
                     </button>
 
-                    {/* UPGRADE BUTTON */}
                     <button
                       onClick={() => upgradeWeapon(weapon.id)}
                       disabled={!canAffordUpgrade}
@@ -993,7 +959,6 @@ function App() {
                       {canAffordUpgrade ? "UPGRADE (10G)" : "NEED 10G"}
                     </button>
 
-                    {/* SELL BUTTON */}
                     <button
                       onClick={() => {
                         const p = window.prompt("Sale Price (GOLD):", "50");
@@ -1126,6 +1091,7 @@ function App() {
           </div>
         </section>
       </div>
+
       {/* --- SECTION: LEADERBOARD --- */}
       <div style={{ marginTop: "60px", paddingBottom: "60px" }}>
         <div
@@ -1177,7 +1143,7 @@ function App() {
                     ? "silver"
                     : index === 2
                     ? "#cd7f32"
-                    : "#00ff41", // Gold/Silver/Bronze colors
+                    : "#00ff41",
                 fontWeight: index < 3 ? "bold" : "normal",
                 fontSize: index === 0 ? "1.2rem" : "1rem",
               }}
