@@ -1,4 +1,4 @@
-# ⚔️ GenAI GameFi Armory v2.0
+# ⚔️ GenAI GameFi Armory 
 A Full-Stack Hybrid Application merging Generative AI (Gemini), DeFi, and Blockchain Gaming.
 
 --------------------------------------------------
