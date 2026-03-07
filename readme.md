@@ -1,5 +1,14 @@
 # ⚔️ GenAI GameFi Armory 
-A Full-Stack Hybrid Application merging Generative AI (Gemini), DeFi, and Blockchain Gaming.
+> A Full-Stack Hybrid Application merging Generative AI (Gemini), DeFi, and Blockchain Gaming.
+
+
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Ethereum](https://img.shields.io/badge/Blockchain-Ethereum-blue)
+![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688)
+![React](https://img.shields.io/badge/Frontend-React-61dafb)
+
+<img width="1920" height="2301" alt="NFT-ARMORY-03-08-2026_01_56_AM" src="https://github.com/user-attachments/assets/64a24a3b-81ff-4473-939a-45a5751da470" />
+
 
 --------------------------------------------------
 
